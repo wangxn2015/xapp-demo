@@ -1,0 +1,7 @@
+cmd/onos/onos
+build/_output
+*.DS_Store
+coverage.txt
+*.coverprofile
+.idea
+vendor
