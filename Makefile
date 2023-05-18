@@ -3,8 +3,6 @@ export GO111MODULE=on
 
 proto_path="api/kpimon:${GOPATH}/pkg/src/github.com/gogo/protobuf/protobuf:${GOPATH}/pkg/src/github.com/gogo/protobuf:${GOPATH}/pkg/src"
 
-
-
 .PHONY: gen client clean
 
 gen:

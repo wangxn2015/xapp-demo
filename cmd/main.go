@@ -13,23 +13,12 @@ const (
 	defaultAddress = "192.168.127.113:6789" //!![此处需要配置] 将要连接的， KPM xapp的北向接口
 )
 const (
-	configDir  = ".onos"
 	addressKey = "service-address"
 
 	tlsCertPathKey = "tls.certPath"
 	tlsKeyPathKey  = "tls.keyPath"
 	noTLSKey       = "no-tls"
 	authHeaderKey  = "auth-header"
-
-	addressFlag     = "service-address"
-	tlsCertPathFlag = "tls-cert-path"
-	tlsKeyPathFlag  = "tls-key-path"
-	noTLSFlag       = "no-tls"
-	// AuthHeaderFlag - the flag name
-	AuthHeaderFlag = "auth-header"
-
-	// Authorization the header keyword
-	Authorization = "authorization"
 )
 
 var configName string
@@ -51,9 +40,6 @@ func main() {
 	certPath := flag.String("certPath", "certs/tls.crt", "path to client certificate")
 	kpimonEndpoint := flag.String("kpimonEndpoint", defaultAddress, "kpimon service endpoint")
 	noTLSFlag := flag.Bool(noTLSKey, false, "no TLS flag -- true or false")
-	//ricActionID := flag.Int("ricActionID", 10, "RIC Action ID in E2 message")
-	//configPath := flag.String("configPath", "/etc/onos/config/config.json", "path to config.json file")
-	//grpcPort := flag.Int("grpcPort", 5150, "grpc Port number")
 
 	ready := make(chan bool)
 
@@ -72,9 +58,6 @@ func main() {
 		CertPath:       *certPath,
 		KpimonEndpoint: *kpimonEndpoint,
 		NoTLSFlag:      *noTLSFlag,
-		//GRPCPort:    *grpcPort,
-		//RicActionID: int32(*ricActionID),
-		//ConfigPath:  *configPath,
 	}
 
 	mgr := manager.NewManager(cfg)
