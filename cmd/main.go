@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	defaultAddress = "192.168.127.113:6789" //将要连接的， KPM xapp的北向接口
+	defaultAddress = "192.168.127.113:6789" //[此处需要配置] 将要连接的， KPM xapp的北向接口
 )
 const (
 	configDir  = ".onos"

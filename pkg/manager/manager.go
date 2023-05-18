@@ -1,19 +1,17 @@
 package manager
 
 import (
+	"context"
 	"crypto/tls"
+	"fmt"
+	prototypes "github.com/gogo/protobuf/types"
+	"github.com/wangxn2015/onos-lib-go/pkg/certs"
 	"github.com/wangxn2015/onos-lib-go/pkg/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-
-	"context"
-	"fmt"
-	"github.com/wangxn2015/onos-lib-go/pkg/certs"
-	"sort"
-	"strings"
+	"io"
 	"time"
 
-	prototypes "github.com/gogo/protobuf/types"
 	//"github.com/prometheus/common/log"
 
 	kpimonapi "github.com/wangxn2015/xapp-demo/api/onos.kpimon"
@@ -87,7 +85,8 @@ func (m *Manager) startClient() error {
 	}
 	m.conn = conn
 
-	m.HandleRequest()
+	m.HandleRequestRepeated()
+
 	log.Info("closing conn")
 	conn.Close()
 	return nil
@@ -140,8 +139,146 @@ func (m *Manager) GetConnection() (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
-func (m *Manager) HandleRequest() error {
-	var types []string
+func (m *Manager) HandleRequestRepeated() error {
+	//var types []string
+	var results map[string]map[uint64]map[string]string
+
+	request := kpimonapi.GetRequest{}
+	client := kpimonapi.NewKpimonClient(m.conn)
+
+	respWatchMeasurement, err := client.WatchMeasurements(context.Background(), &request)
+	if err != nil {
+		return err
+	}
+
+	for {
+		respGetMeasurement, err := respWatchMeasurement.Recv()
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+		results = make(map[string]map[uint64]map[string]string)
+
+		attr := make(map[string]string)
+		for key, measItems := range respGetMeasurement.GetMeasurements() {
+			//在目前的配置中，measItems.MeasurementItems测量重复共2次，见打印中的ii=0,1
+			for ii, measItem := range measItems.MeasurementItems {
+				fmt.Printf("ii= %d\n", ii)
+				for _, measRecord := range measItem.MeasurementRecords {
+					timeStamp := measRecord.Timestamp
+					measName := measRecord.MeasurementName
+					measValue := measRecord.MeasurementValue
+
+					if _, ok := attr[measName]; !ok {
+						attr[measName] = measName
+					}
+
+					if _, ok1 := results[key]; !ok1 {
+						results[key] = make(map[uint64]map[string]string)
+					}
+					if _, ok2 := results[key][timeStamp]; !ok2 {
+						results[key][timeStamp] = make(map[string]string)
+					}
+
+					var value interface{}
+					switch {
+					case prototypes.Is(measValue, &kpimonapi.IntegerValue{}):
+						v := kpimonapi.IntegerValue{}
+						err := prototypes.UnmarshalAny(measValue, &v)
+						if err != nil {
+							log.Warn(err)
+						}
+						value = v.GetValue()
+						fmt.Printf("%s\t: %d\t"+"time: %v\t %v\n", measName, value, timeStamp, time.Unix(0, int64(timeStamp)))
+
+					case prototypes.Is(measValue, &kpimonapi.RealValue{}):
+						v := kpimonapi.RealValue{}
+						err := prototypes.UnmarshalAny(measValue, &v)
+						if err != nil {
+							log.Warn(err)
+						}
+						value = v.GetValue()
+						fmt.Printf("%s\t: %f\t"+"time: %v\t %v\n", measName, value, timeStamp, time.Unix(0, int64(timeStamp)))
+
+					case prototypes.Is(measValue, &kpimonapi.NoValue{}):
+						v := kpimonapi.NoValue{}
+						err := prototypes.UnmarshalAny(measValue, &v)
+						if err != nil {
+							log.Warn(err)
+						}
+						value = v.GetValue()
+						fmt.Printf("%s\t: N/A %v\t"+"time: %v\t %v\n", measName, value, timeStamp, time.Unix(0, int64(timeStamp)))
+
+					}
+
+					results[key][timeStamp][measName] = fmt.Sprintf("%v", value)
+				}
+			}
+		}
+		fmt.Printf("-------\n")
+		//或者可以使用results结构，一次性打印，如下
+		log.Info("Data received is: ", results)
+		//-----------------------------------
+
+		//
+		//types = []string{}
+		//
+		//for key := range attr {
+		//	types = append(types, key)
+		//}
+		//sort.Strings(types)
+		//
+		//keys := make([]string, 0, len(results))
+		//for k := range results {
+		//	keys = append(keys, k)
+		//}
+		//sort.Strings(keys)
+		//
+		//for _, keyID := range keys {
+		//	metrics := results[keyID]
+		//	// sort 2nd map with timestamp
+		//	timeKeySlice := make([]uint64, 0, len(metrics))
+		//	for timeStampKey := range metrics {
+		//		timeKeySlice = append(timeKeySlice, timeStampKey)
+		//	}
+		//
+		//	sort.Slice(timeKeySlice, func(i, j int) bool { return timeKeySlice[i] < timeKeySlice[j] })
+		//
+		//	for _, timeStamp := range timeKeySlice {
+		//		timeObj := time.Unix(0, int64(timeStamp))
+		//		tsFormat := fmt.Sprintf("%02d:%02d:%02d.%d", timeObj.Hour(), timeObj.Minute(), timeObj.Second(), timeObj.Nanosecond()/1000000)
+		//
+		//		ids := strings.Split(keyID, ":")
+		//		e2id, nodeID, cellID, cellGlobalID := ids[0], ids[1], ids[2], ids[3]
+		//		resultLine := fmt.Sprintf("%-10s %20s %20s %15s", fmt.Sprintf("%s:%s", e2id, nodeID), cellID, cellGlobalID, tsFormat)
+		//
+		//		for _, typeValue := range types {
+		//			tmpResultLine := resultLine
+		//
+		//			var tmpValue string
+		//			if _, ok := metrics[timeStamp][typeValue]; !ok {
+		//				tmpValue = "N/A"
+		//			} else {
+		//				tmpValue = metrics[timeStamp][typeValue]
+		//			}
+		//			resultLine = fmt.Sprintf(fmt.Sprintf("%%s %%%ds", len(typeValue)+3), tmpResultLine, tmpValue)
+		//		}
+		//		log.Info(resultLine)
+		//
+		//	}
+		//
+		//}
+
+	}
+	return nil
+}
+
+func (m *Manager) HandleRequestForOneTimeRequest() error {
+	//var types []string
 	results := make(map[string]map[uint64]map[string]string)
 
 	request := kpimonapi.GetRequest{}
@@ -202,68 +339,67 @@ func (m *Manager) HandleRequest() error {
 					value = v.GetValue()
 
 				}
-
 				results[key][timeStamp][measName] = fmt.Sprintf("%v", value)
 			}
 		}
 	}
 
-	for key := range attr {
-		types = append(types, key)
-	}
-	sort.Strings(types)
-
-	header := fmt.Sprintf("%-10s %20s %20s %15s", nodeIDHeader, cellObjIDHeader, cellGlobalIDHeader, timeHeader)
-	//header := fmt.Sprintf("%-10s %20s %20s", "Node ID", "Cell Object ID", "Time")
-
-	for _, key := range types {
-		tmpHeader := header
-		header = fmt.Sprintf(fmt.Sprintf("%%s %%%ds", len(key)+3), tmpHeader, key)
-		//header = fmt.Sprintf("%s %25s", tmpHeader, key)
-	}
-
-	//if !noHeaders {
-	//	_, _ = fmt.Fprintln(writer, header)
+	//for key := range attr {
+	//	types = append(types, key)
 	//}
-
-	keys := make([]string, 0, len(results))
-	for k := range results {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, keyID := range keys {
-		metrics := results[keyID]
-		// sort 2nd map with timestamp
-		timeKeySlice := make([]uint64, 0, len(metrics))
-		for timeStampKey := range metrics {
-			timeKeySlice = append(timeKeySlice, timeStampKey)
-		}
-
-		sort.Slice(timeKeySlice, func(i, j int) bool { return timeKeySlice[i] < timeKeySlice[j] })
-
-		for _, timeStamp := range timeKeySlice {
-			timeObj := time.Unix(0, int64(timeStamp))
-			tsFormat := fmt.Sprintf("%02d:%02d:%02d.%d", timeObj.Hour(), timeObj.Minute(), timeObj.Second(), timeObj.Nanosecond()/1000000)
-
-			ids := strings.Split(keyID, ":")
-			e2ID, nodeID, cellID, cellGlobalID := ids[0], ids[1], ids[2], ids[3]
-			resultLine := fmt.Sprintf("%-10s %20s %20s %15s", fmt.Sprintf("%s:%s", e2ID, nodeID), cellID, cellGlobalID, tsFormat)
-			//resultLine := fmt.Sprintf("%-10s %20s %20s", nodeID, fmt.Sprintf("%x", cellNum), tsFormat)
-			for _, typeValue := range types {
-				tmpResultLine := resultLine
-				var tmpValue string
-				if _, ok := metrics[timeStamp][typeValue]; !ok {
-					tmpValue = "N/A"
-				} else {
-					tmpValue = metrics[timeStamp][typeValue]
-				}
-				resultLine = fmt.Sprintf(fmt.Sprintf("%%s %%%ds", len(typeValue)+3), tmpResultLine, tmpValue)
-			}
-			//_, _ = fmt.Fprintln(writer, resultLine)
-			log.Info(resultLine)
-		}
-		//_ = writer.Flush()
-	}
+	//sort.Strings(types)
+	//
+	//header := fmt.Sprintf("%-10s %20s %20s %15s", nodeIDHeader, cellObjIDHeader, cellGlobalIDHeader, timeHeader)
+	////header := fmt.Sprintf("%-10s %20s %20s", "Node ID", "Cell Object ID", "Time")
+	//
+	//for _, key := range types {
+	//	tmpHeader := header
+	//	header = fmt.Sprintf(fmt.Sprintf("%%s %%%ds", len(key)+3), tmpHeader, key)
+	//	//header = fmt.Sprintf("%s %25s", tmpHeader, key)
+	//}
+	//
+	////if !noHeaders {
+	////	_, _ = fmt.Fprintln(writer, header)
+	////}
+	//
+	//keys := make([]string, 0, len(results))
+	//for k := range results {
+	//	keys = append(keys, k)
+	//}
+	//sort.Strings(keys)
+	//
+	//for _, keyID := range keys {
+	//	metrics := results[keyID]
+	//	// sort 2nd map with timestamp
+	//	timeKeySlice := make([]uint64, 0, len(metrics))
+	//	for timeStampKey := range metrics {
+	//		timeKeySlice = append(timeKeySlice, timeStampKey)
+	//	}
+	//
+	//	sort.Slice(timeKeySlice, func(i, j int) bool { return timeKeySlice[i] < timeKeySlice[j] })
+	//
+	//	for _, timeStamp := range timeKeySlice {
+	//		timeObj := time.Unix(0, int64(timeStamp))
+	//		tsFormat := fmt.Sprintf("%02d:%02d:%02d.%d", timeObj.Hour(), timeObj.Minute(), timeObj.Second(), timeObj.Nanosecond()/1000000)
+	//
+	//		ids := strings.Split(keyID, ":")
+	//		e2ID, nodeID, cellID, cellGlobalID := ids[0], ids[1], ids[2], ids[3]
+	//		resultLine := fmt.Sprintf("%-10s %20s %20s %15s", fmt.Sprintf("%s:%s", e2ID, nodeID), cellID, cellGlobalID, tsFormat)
+	//		//resultLine := fmt.Sprintf("%-10s %20s %20s", nodeID, fmt.Sprintf("%x", cellNum), tsFormat)
+	//		for _, typeValue := range types {
+	//			tmpResultLine := resultLine
+	//			var tmpValue string
+	//			if _, ok := metrics[timeStamp][typeValue]; !ok {
+	//				tmpValue = "N/A"
+	//			} else {
+	//				tmpValue = metrics[timeStamp][typeValue]
+	//			}
+	//			resultLine = fmt.Sprintf(fmt.Sprintf("%%s %%%ds", len(typeValue)+3), tmpResultLine, tmpValue)
+	//		}
+	//		//_, _ = fmt.Fprintln(writer, resultLine)
+	//		log.Info(resultLine)
+	//	}
+	//	//_ = writer.Flush()
+	//}
 	return nil
 }
