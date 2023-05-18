@@ -10,8 +10,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"io"
-	"time"
-
 	//"github.com/prometheus/common/log"
 
 	kpimonapi "github.com/wangxn2015/xapp-demo/api/onos.kpimon"
@@ -193,7 +191,8 @@ func (m *Manager) HandleRequestRepeated() error {
 							log.Warn(err)
 						}
 						value = v.GetValue()
-						fmt.Printf("%s\t: %d\t"+"time: %v\t %v\n", measName, value, timeStamp, time.Unix(0, int64(timeStamp)))
+						//fmt.Printf("%s\t: %d\t"+"time: %v\t %v\n", measName, value, timeStamp, time.Unix(0, int64(timeStamp)))
+						fmt.Printf("%s\t: %d\t"+"time: %v\t \n", measName, value, timeStamp)
 
 					case prototypes.Is(measValue, &kpimonapi.RealValue{}):
 						v := kpimonapi.RealValue{}
@@ -202,8 +201,8 @@ func (m *Manager) HandleRequestRepeated() error {
 							log.Warn(err)
 						}
 						value = v.GetValue()
-						fmt.Printf("%s\t: %f\t"+"time: %v\t %v\n", measName, value, timeStamp, time.Unix(0, int64(timeStamp)))
-
+						//fmt.Printf("%s\t: %f\t"+"time: %v\t %v\n", measName, value, timeStamp, time.Unix(0, int64(timeStamp)))
+						fmt.Printf("%s\t: %f\t"+"time: %v\t \n", measName, value, timeStamp)
 					case prototypes.Is(measValue, &kpimonapi.NoValue{}):
 						v := kpimonapi.NoValue{}
 						err := prototypes.UnmarshalAny(measValue, &v)
@@ -211,7 +210,8 @@ func (m *Manager) HandleRequestRepeated() error {
 							log.Warn(err)
 						}
 						value = v.GetValue()
-						fmt.Printf("%s\t: N/A %v\t"+"time: %v\t %v\n", measName, value, timeStamp, time.Unix(0, int64(timeStamp)))
+						//fmt.Printf("%s\t: N/A %v\t"+"time: %v\t %v\n", measName, value, timeStamp, time.Unix(0, int64(timeStamp)))
+						fmt.Printf("%s\t: N/A %v\t"+"time: %v\t \n", measName, value, timeStamp)
 
 					}
 
@@ -223,55 +223,6 @@ func (m *Manager) HandleRequestRepeated() error {
 		//或者可以使用results结构，一次性打印，如下
 		log.Info("Data received is: ", results)
 		//-----------------------------------
-
-		//
-		//types = []string{}
-		//
-		//for key := range attr {
-		//	types = append(types, key)
-		//}
-		//sort.Strings(types)
-		//
-		//keys := make([]string, 0, len(results))
-		//for k := range results {
-		//	keys = append(keys, k)
-		//}
-		//sort.Strings(keys)
-		//
-		//for _, keyID := range keys {
-		//	metrics := results[keyID]
-		//	// sort 2nd map with timestamp
-		//	timeKeySlice := make([]uint64, 0, len(metrics))
-		//	for timeStampKey := range metrics {
-		//		timeKeySlice = append(timeKeySlice, timeStampKey)
-		//	}
-		//
-		//	sort.Slice(timeKeySlice, func(i, j int) bool { return timeKeySlice[i] < timeKeySlice[j] })
-		//
-		//	for _, timeStamp := range timeKeySlice {
-		//		timeObj := time.Unix(0, int64(timeStamp))
-		//		tsFormat := fmt.Sprintf("%02d:%02d:%02d.%d", timeObj.Hour(), timeObj.Minute(), timeObj.Second(), timeObj.Nanosecond()/1000000)
-		//
-		//		ids := strings.Split(keyID, ":")
-		//		e2id, nodeID, cellID, cellGlobalID := ids[0], ids[1], ids[2], ids[3]
-		//		resultLine := fmt.Sprintf("%-10s %20s %20s %15s", fmt.Sprintf("%s:%s", e2id, nodeID), cellID, cellGlobalID, tsFormat)
-		//
-		//		for _, typeValue := range types {
-		//			tmpResultLine := resultLine
-		//
-		//			var tmpValue string
-		//			if _, ok := metrics[timeStamp][typeValue]; !ok {
-		//				tmpValue = "N/A"
-		//			} else {
-		//				tmpValue = metrics[timeStamp][typeValue]
-		//			}
-		//			resultLine = fmt.Sprintf(fmt.Sprintf("%%s %%%ds", len(typeValue)+3), tmpResultLine, tmpValue)
-		//		}
-		//		log.Info(resultLine)
-		//
-		//	}
-		//
-		//}
 
 	}
 	return nil
@@ -344,62 +295,5 @@ func (m *Manager) HandleRequestForOneTimeRequest() error {
 		}
 	}
 
-	//for key := range attr {
-	//	types = append(types, key)
-	//}
-	//sort.Strings(types)
-	//
-	//header := fmt.Sprintf("%-10s %20s %20s %15s", nodeIDHeader, cellObjIDHeader, cellGlobalIDHeader, timeHeader)
-	////header := fmt.Sprintf("%-10s %20s %20s", "Node ID", "Cell Object ID", "Time")
-	//
-	//for _, key := range types {
-	//	tmpHeader := header
-	//	header = fmt.Sprintf(fmt.Sprintf("%%s %%%ds", len(key)+3), tmpHeader, key)
-	//	//header = fmt.Sprintf("%s %25s", tmpHeader, key)
-	//}
-	//
-	////if !noHeaders {
-	////	_, _ = fmt.Fprintln(writer, header)
-	////}
-	//
-	//keys := make([]string, 0, len(results))
-	//for k := range results {
-	//	keys = append(keys, k)
-	//}
-	//sort.Strings(keys)
-	//
-	//for _, keyID := range keys {
-	//	metrics := results[keyID]
-	//	// sort 2nd map with timestamp
-	//	timeKeySlice := make([]uint64, 0, len(metrics))
-	//	for timeStampKey := range metrics {
-	//		timeKeySlice = append(timeKeySlice, timeStampKey)
-	//	}
-	//
-	//	sort.Slice(timeKeySlice, func(i, j int) bool { return timeKeySlice[i] < timeKeySlice[j] })
-	//
-	//	for _, timeStamp := range timeKeySlice {
-	//		timeObj := time.Unix(0, int64(timeStamp))
-	//		tsFormat := fmt.Sprintf("%02d:%02d:%02d.%d", timeObj.Hour(), timeObj.Minute(), timeObj.Second(), timeObj.Nanosecond()/1000000)
-	//
-	//		ids := strings.Split(keyID, ":")
-	//		e2ID, nodeID, cellID, cellGlobalID := ids[0], ids[1], ids[2], ids[3]
-	//		resultLine := fmt.Sprintf("%-10s %20s %20s %15s", fmt.Sprintf("%s:%s", e2ID, nodeID), cellID, cellGlobalID, tsFormat)
-	//		//resultLine := fmt.Sprintf("%-10s %20s %20s", nodeID, fmt.Sprintf("%x", cellNum), tsFormat)
-	//		for _, typeValue := range types {
-	//			tmpResultLine := resultLine
-	//			var tmpValue string
-	//			if _, ok := metrics[timeStamp][typeValue]; !ok {
-	//				tmpValue = "N/A"
-	//			} else {
-	//				tmpValue = metrics[timeStamp][typeValue]
-	//			}
-	//			resultLine = fmt.Sprintf(fmt.Sprintf("%%s %%%ds", len(typeValue)+3), tmpResultLine, tmpValue)
-	//		}
-	//		//_, _ = fmt.Fprintln(writer, resultLine)
-	//		log.Info(resultLine)
-	//	}
-	//	//_ = writer.Flush()
-	//}
 	return nil
 }
